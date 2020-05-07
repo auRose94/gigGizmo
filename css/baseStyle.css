@@ -1,0 +1,22 @@
+body {
+	background-color: black;
+}
+
+.form-group {
+	margin-bottom: 1rem;
+}
+
+.loginCard {
+	width: max-content;
+	min-width: 360px;
+	margin: 6em auto auto auto;
+	padding: 1em;
+}
+
+.pageCard {
+	width: 100%;
+	max-width: 85em;
+	min-width: 360px;
+	margin: 6em auto auto auto;
+	padding: 1em;
+}

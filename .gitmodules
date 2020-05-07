@@ -1,0 +1,3 @@
+[submodule "3rdParty/bootstrap"]
+	path = 3rdParty/bootstrap
+	url = https://github.com/twbs/bootstrap.git
