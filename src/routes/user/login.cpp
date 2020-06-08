@@ -28,43 +28,49 @@ namespace gg {
 			pText = passwordError;
 			pClass = "form-text text-danger";
 		}
-		auto em = formInput("email", "email", "Email", true);
+		auto em = formInputRow("email", "email", "Email", true);
 		em += {small({
-			obj{{"id", "emailHelp"}, {"class", eClass}},
+			atts{{"id", "emailHelp"}, {"class", eClass}},
 			eText,
 		})};
 		auto ps =
-			formInput("password", "password", "Password", true);
+			formInputRow("password", "password", "Password", true);
 		ps += {small({
-			obj{{"id", "passwordHelp"}, {"class", pClass}},
+			atts{{"id", "passwordHelp"}, {"class", pClass}},
 			pText,
 		})};
 		auto content = gold::list{
 			div({
-				obj{{"class", "card loginCard"}},
+				atts{{"class", "card loginCard text-light bg-dark"}},
 				div({
-					obj{{"class", "card-body"}},
+					atts{{"class", "card-body"}},
 					h5({
-						obj{{"class", "card-title"}},
+						atts{{"class", "card-title"}},
 						"Login",
 					}),
 				}),
-				h3({obj{
+				h3({atts{
 							{"class", response.empty() ? "" : "text-danger"}},
 						response}),
 				form({
-					obj{{"method", "post"}},
+					atts{{"id", "login"}, {"method", "post"}},
 					em,
 					ps,
 					formCheck("rememberMe", "Remember Me!"),
 					button({
-						obj{
+						atts{
+							{"id", "formSubmit"},
 							{"type", "submit"},
 							{"class", "btn btn-primary float-right"},
 						},
 						"Submit",
 					}),
 				}),
+			}),
+			script({
+				atts{
+					{"src", "/js/main/loginCallback.js"},
+				},
 			}),
 		};
 		return content;

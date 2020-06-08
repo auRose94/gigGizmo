@@ -9,28 +9,90 @@
 namespace gg {
 
 	collection session::col;
-	const auto expireOffset = 86400;
+	const auto expireOffset = 86400000;
+
+	gold::var session::getSession(list args) {
+		auto req = args[0].getObject<request>();
+		auto seshId = string();
+		if (seshId.size() == 0) {
+			auto query = object();
+			parseURLEncoded(req.getQuery(), query);
+			seshId = query.getString("s");
+		}
+		if (seshId.size() == 0) {
+			auto cookie = req.getHeader({"Cookie"});
+			auto query = object();
+			parseCookie(cookie, query);
+			seshId = query.getString("session");
+		}
+		auto agent = req.getHeader({"user-agent"}).getString();
+		return session::findOne(
+			{obj{{"_id", seshId}, {"agent", agent}}});
+	}
+
+	gold::var session::writeSession(list args) {
+		auto options = args.getObject(0);
+		auto res = options.getObject<response>("res");
+		auto redirect = options.getString("redirect");
+		auto url = string(redirect);
+		auto seshId = getString("_id");
+		if (!getBool("useCookies")) {
+			auto q = "?s=" + seshId;
+			url += q;
+		} else {
+			auto maxAge =
+				to_string((getUInt64("expire") - getMonoTime()) / 1000);
+			auto domain = getString("domain");
+			auto cookie = obj{
+				{"session", seshId}, {"Domain", domain},
+				{"Max-Age", maxAge}, {"SameSite", "Strict"},
+				{"Path", "/"},
+			};
+			res.writeHeader(
+				{"Set-Cookie", (cookie.getCookieString())});
+		}
+		if (redirect.size() != 0) {
+			res.writeHeader({"Location", url});
+			res.writeStatus({"303 See Other"});
+		}
+		return var();
+	}
+
+	gold::var session::getSeshUser(list args) {
+		auto req = args[0].getObject<request>();
+		auto sesh =
+			req.callMethod("getSession").getObject<session>();
+		return sesh.getUser();
+	}
 
 	obj& session::getPrototype() {
 		static auto proto = obj({
 			{"user", ""},
 			{"app", ""},
 			{"expire", 0},
+			{"agent", ""},
+			{"useCookies", false},
+			{"domain", ""},
 			{"isExpired", method(&session::isExpired)},
 			{"getUser", method(&session::getUser)},
 			{"reset", method(&session::reset)},
 			{"save", method(&session::save)},
 			{"proto", model::getPrototype()},
 		});
+		auto getSession = func(session::getSession);
+		auto getSeshUser = func(session::getSeshUser);
+		auto requestProto = request::getPrototype();
+		requestProto.setFunc("getSession", getSession);
+		requestProto.setFunc("getUser", getSeshUser);
 		return proto;
 	}
 
-	session::session() : model(col) { setParent(getPrototype()); }
+	session::session() : model() {}
 
 	session::session(user u) : model(col) {
 		setParent(getPrototype());
 		setString("user", u.getID());
-		setInt64("expire", getMonoTime() + expireOffset);
+		setUInt64("expire", getMonoTime() + expireOffset);
 	}
 
 	session::session(obj data) : model(col, data) {
@@ -39,8 +101,8 @@ namespace gg {
 
 	var session::isExpired(list) {
 		auto current = getMonoTime();
-		auto expire = getInt64("expire");
-		return current <= expire;
+		auto expire = getUInt64("expire");
+		return current > expire;
 	}
 
 	var session::getUser(list) {
@@ -52,8 +114,9 @@ namespace gg {
 
 	var session::reset(list) {
 		auto now = getMonoTime();
-		setInt64("expire", now + expireOffset);
-		return var();
+		auto expire = now + expireOffset;
+		setUInt64("expire", expire);
+		return expire;
 	}
 
 	var session::save(list args) {

@@ -7,8 +7,7 @@ namespace gg {
 	using div = HTML::div;
 	using namespace HTML;
 
-	li navDropdown(
-		string id, string title, gold::list children) {
+	li navDropdown(string id, string title, gold::list children) {
 		auto container = div({
 			obj{
 				{"class", "dropdown-menu"},
@@ -75,12 +74,12 @@ namespace gg {
 	}
 
 	gold::HTML::ul navbar(
-		user& u, session& sesh, string current) {
+		user u, session sesh, string current) {
 		string firstName = "User";
-		string rootUrl = "";
+		string q = "";
 		auto errors = gold::list();
 		if (u) firstName = u.getString("firstName");
-		if (sesh) rootUrl = string("/") + sesh.getID();
+		if (sesh) q = "?s=" + sesh.getID();
 
 		auto ret = ul({
 			obj{{"class", "navbar-nav mr-auto"}},
@@ -88,28 +87,23 @@ namespace gg {
 		auto userDropdownTitle = u ? firstName : "Guest";
 		if (u) {
 			auto vItems = gold::list({
+				navDropdownItem("/venue" + q, "New Venue", current),
 				navDropdownItem(
-					rootUrl + "/venue/", "New Venue", current),
+					"/list/venue" + q, "List Venues", current),
 				navDropdownItem(
-					rootUrl + "/list/venue/", "List Venues", current),
-				navDropdownItem(
-					rootUrl + "/find/venue/", "Find Venue", current),
+					"/find/venue" + q, "Find Venue", current),
 			});
 			auto bItems = gold::list({
+				navDropdownItem("/band" + q, "New Band", current),
 				navDropdownItem(
-					rootUrl + "/band/", "New Band", current),
-				navDropdownItem(
-					rootUrl + "/list/band/", "List Bands", current),
-				navDropdownItem(
-					rootUrl + "/find/band/", "Find Band", current),
+					"/list/band" + q, "List Bands", current),
+				navDropdownItem("/find/band" + q, "Find Band", current),
 			});
 			auto uItem = gold::list({
-				navDropdownItem(rootUrl + "/home", "Home", current),
-				navDropdownItem(
-					rootUrl + "/options", "Options", current),
-				navDropdownItem(
-					rootUrl + "/register", "Register", current),
-				navDropdownItem(rootUrl + "/login", "Login", current),
+				navDropdownItem("/home" + q, "Home", current),
+				navDropdownItem("/options" + q, "Options", current),
+				navDropdownItem("/register" + q, "Register", current),
+				navDropdownItem("/login" + q, "Login", current),
 			});
 			ret +=
 				{navDropdown("userDropdown", userDropdownTitle, uItem),
@@ -117,18 +111,15 @@ namespace gg {
 				 navDropdown("bandDropdown", "Band", bItems)};
 		} else {
 			auto uItems = gold::list({
-				navDropdownItem(
-					rootUrl + "/register", "Register", current),
+				navDropdownItem("/register" + q, "Register", current),
 
-				navDropdownItem(rootUrl + "/login", "Login", current),
+				navDropdownItem("/login" + q, "Login", current),
 			});
 
 			ret +=
 				{navDropdown("userDropdown", userDropdownTitle, uItems),
-				 navOption(
-					 rootUrl + "/find/venue/", "Find Venue", current),
-				 navOption(
-					 rootUrl + "/find/band/", "Find Music", current)};
+				 navOption("/find/venue/" + q, "Find Venue", current),
+				 navOption("/find/band/" + q, "Find Music", current)};
 		}
 
 		auto errJson = errors.getJSON();
@@ -139,29 +130,16 @@ namespace gg {
 
 	gold::HTML::ul navbar(request req) {
 		auto path = req.getString("path");
-		auto sessionID = req.getParameter({0}).getString();
+		auto sesh =
+			req.callMethod("getSession").getObject<session>();
+		auto sessionID = sesh.getString("_id");
 		auto uVar = gold::var();
-		auto seshVar = gold::var();
 		string firstName = "User";
 		string rootUrl = "";
 		user u;
-		session sesh;
 		auto errors = gold::list();
-		if (sessionID.size() > 0) {
-			seshVar = session::findOne({obj{{"_id", sessionID}}});
-			if (seshVar.isError()) errors.pushVar(seshVar);
-			if (seshVar.isObject()) {
-				sesh = seshVar.getObject<session>();
-				if (!sesh.isExpired()) {
-					uVar = sesh.getUser();
-					if (uVar.isError()) errors.pushVar(uVar);
-					if (uVar.isObject()) {
-						u = uVar.getObject<user>();
-						firstName = u.getString("firstName");
-						rootUrl = string("/") + sessionID;
-					}
-				}
-			}
+		if (!sesh.isExpired()) {
+			u = sesh.getUser().getObject<user>();
 		}
 		return navbar(u, sesh, path);
 	}

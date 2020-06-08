@@ -66,7 +66,7 @@ namespace gg {
 			return element;
 		}
 
-		div formInput(
+		div formInputRow(
 			string type, string name, string labelText, bool req,
 			string error, obj inputAtts) {
 			auto hasError = error.size() > 0;
@@ -91,6 +91,54 @@ namespace gg {
 			if (hasError)
 				element +=
 					{div({obj{{"class", "invalid-feedback"}}, error})};
+			return element;
+		}
+
+		div formInputColumn(
+			string type, string name, string labelText, bool req,
+			string error, object inputAtts) {
+			auto hasError = error.size() > 0;
+			auto inputClasses = string("form-control");
+			if (hasError) inputClasses += " is-invalid";
+			auto inputAttributes = obj{
+				{"type", type}, {"class", inputClasses},
+				{"id", name},   {"aria-describedby", name + "Help"},
+				{"name", name}, {"required", req},
+			};
+			inputAttributes.copy(inputAtts);
+			auto inputElement = input({inputAttributes});
+			auto element = div({
+				obj{{"class", "form-group"}},
+				label({
+					obj{{"class", "form-label"}, {"for", name}},
+					labelText,
+				}),
+				inputElement,
+			});
+			if (hasError)
+				element +=
+					{div({obj{{"class", "invalid-feedback"}}, error})};
+			return element;
+		}
+
+		div formFileInput(
+			string id, string labelText, object inputAtts) {
+			auto inputAttributes = obj{
+				{"type", "file"},
+				{"class", "form-control-file"},
+				{"id", id},
+				{"aria-describedby", id + "Help"},
+			};
+			inputAttributes.copy(inputAtts);
+			auto inputElement = input({inputAttributes});
+			auto element = div({
+				obj{{"class", "form-group"}},
+				label({
+					obj{{"style", "margin-right: 16px;"}, {"for", id}},
+					labelText,
+				}),
+				inputElement,
+			});
 			return element;
 		}
 

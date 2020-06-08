@@ -13,6 +13,7 @@
 
 #include "bootstrap.hpp"
 #include "error.hpp"
+#include "file.hpp"
 #include "session.hpp"
 #include "template.hpp"
 #include "user.hpp"
@@ -21,7 +22,6 @@
 namespace gg {
 
 	using namespace CryptoPP;
-	collection user::col;
 	static mutex cryptoMutex;
 
 	obj& user::getPrototype() {
@@ -52,307 +52,303 @@ namespace gg {
 		auto colRes = db.getCollection({"user"});
 		if (!colRes.isObject()) cerr << colRes << endl;
 		auto def = collection();
-		col = colRes.getObject<collection>();
+		auto col = colRes.getObject<collection>();
+		getPrototype().setObject("collection", col);
 
-		func getUserHome = [](const list& args) -> gold::var {
+		func getUserHome = [](list args) -> gold::var {
 			serveArgs(args, req, res);
-			auto seshId = req.getParameter({0}).getString();
-			auto found = session::findOne({obj{{"_id", seshId}}});
+			auto sesh =
+				req.callMethod("getSession").getObject<session>();
 			auto d = html();
-			if (found.isObject(session::getPrototype())) {
-				auto sesh = found.getObject<session>();
-				auto uVar = sesh.getUser();
-				auto u = uVar.getObject<user>();
-				auto url = string("/") + seshId + "/home";
-				d = getTemplateEx(u, sesh, url, user::userHome(sesh));
-			} else {
-				d = getTemplate(req, errorPage({found}));
+			if (sesh) {
+				auto u = req.callMethod("getUser").getObject<user>();
+				auto url = "/home";
+				return res.end(
+					{getTemplateEx(u, sesh, url, user::userHome(sesh))});
 			}
 
-			res.writeHeader({"Content-Type", "text/html"});
-			return res.end({string(d)});
+			return req.setYield({true});
 		};
 
-		func getLogin = [](const list& args) -> gold::var {
+		func getLogin = [](list args) -> gold::var {
 			serveArgs(args, req, res);
 			auto content = user::userLogin();
-			auto resp = getTemplate(req, content);
 
-			auto d = (string)(resp);
-			res.writeHeader({"Content-Type", "text/html"});
-			return res.end({d});
+			return res.end({getTemplate(req, content)});
 		};
 
-		func postLogin = [](const list& args) -> gold::var {
+		func postLogin = [](list args) -> gold::var {
 			serveArgs(args, req, res);
-			std::string* buffer = new string();
+			func onDataCallback = [](const list& dargs) -> gold::var {
+				auto data = dargs[0].getString();
+				auto req = dargs[1].getObject<request>();
+				auto res = dargs[2].getObject<response>();
+				auto agent = req.getHeader({"user-agent"}).getString();
+				string userEmail;
+				string userPassword;
 
-			func onDataCallback = [=](const list& dargs) -> gold::var {
-				serveArgs(dargs, req, res);
-				auto chuck = dargs[0].getString();
-				auto isEnd = dargs[1].getBool();
-				(*buffer) = (*buffer) + chuck;
-				if (isEnd) {
-					string userEmail;
-					string userPassword;
+				auto p = obj();
+				if (req.isWWWFormURLEncoded()) {
+					obj::parseURLEncoded(data, p);
+					userEmail = p.getString("email");
+					userPassword = p.getString("password");
+				} else if (req.isJSON()) {
+					p = file::parseJSON(data);
+					userEmail = p.getString("email");
+					userPassword = p.getString("password");
+				}
 
-					auto params = obj();
-					obj::parseURLEncoded(*buffer, params);
-					userEmail = params.getString("email");
-					userPassword = params.getString("password");
-					auto acceptHeader = req.getHeader({"accept"});
-					auto allHeaders = req.getAllHeaders();
-					auto acceptValue = !acceptHeader.isEmpty()
-															 ? acceptHeader.getString()
-															 : string("application/json");
-					if (acceptValue.find("text/html") != string::npos) {
-						auto content = gold::list();
-						auto error = string("");
-						if (user::invalidEmail(userEmail, error))
-							content = user::userLogin("", error);
-						else if (user::invalidPassword(userPassword, error))
-							content = user::userLogin("", "", error);
-						else {
-							auto loggedIn =
-								user::login(userEmail, userPassword);
-							if (loggedIn.isError())
-								error = string(*loggedIn.getError());
-							else if (loggedIn.isList()) {
-								auto ret = loggedIn.getList();
-								auto sesh = ret[1].getObject<session>();
-								auto path =
-									string("/") + sesh.getString("_id") + "/home";
-								res.writeStatus({"303 See Other"});
-								res.writeHeader({"Location", path});
-								delete buffer;
-								res.writeHeader({"Content-Type", "text/html"});
-								return res.end({""});
-							} else {
-								error = "Invalid credentials.";
-							}
-							content = user::userLogin(error);
+				auto authHeader =
+					req.getHeader({"authorization"}).getString();
+				if (authHeader.find("Basic") != string::npos) {
+					auto encoded = authHeader.substr(6);
+					auto decoded = file::decodeBase64(encoded);
+					auto str = string(decoded.begin(), decoded.end());
+					auto colonIn = str.find(':');
+					if (colonIn != string::npos) {
+						userEmail = str.substr(0, colonIn);
+						userPassword = str.substr(colonIn + 1);
+					}
+				}
+
+				auto acceptHeader = req.getHeader({"accept"});
+				auto allHeaders = req.getAllHeaders();
+				auto acceptValue = !acceptHeader.isEmpty()
+														 ? acceptHeader.getString()
+														 : string("application/json");
+				if (acceptValue.find("text/html") != string::npos) {
+					auto error = string("");
+					if (user::invalidEmail(userEmail, error))
+						return res.end(
+							{getTemplate(req, user::userLogin("", error))});
+					else if (user::invalidPassword(userPassword, error))
+						return res.end({getTemplate(
+							req, user::userLogin("", "", error))});
+					else {
+						auto loggedIn =
+							user::login(userEmail, userPassword, agent);
+						if (loggedIn.isError())
+							return res.end({getTemplate(
+								req, user::userLogin(*loggedIn.getError()))});
+						else if (loggedIn.isList()) {
+							auto ret = loggedIn.getList();
+							auto sesh = ret[1].getObject<session>();
+							sesh.writeSession({obj{
+								{"res", res},
+								{"redirect", "/home"},
+							}});
+							return res.end(
+								{getTemplate(req, user::userLogin())});
+						} else {
+							return res.end({getTemplate(
+								req, user::userLogin("Invalid credentials."))});
 						}
-
-						auto resp = getTemplate(req, content);
-
-						res.writeHeader({"Content-Type", "text/html"});
-						res.end({string(resp)});
-					} else if (
-						acceptValue.find("application/json") !=
-						string::npos) {
-						cout << "JSON";
+					}
+				} else if (
+					acceptValue.find("application/json") !=
+					string::npos) {
+					string error;
+					if (user::invalidEmail(userEmail, error)) {
+						res.writeStatus({"401 Unauthorized"});
+						return res.end({obj{{"error", error}}});
+					} else if (user::invalidPassword(
+											 userPassword, error)) {
+						res.writeStatus({"401 Unauthorized"});
+						return res.end({obj{{"error", error}}});
 					} else {
-						cout << acceptValue << endl;
-					}
-					delete buffer;
-				}
-				return gold::var();
-			};
-
-			func onAbort = [](const list&) -> gold::var {
-				return gold::var();
-			};
-
-			res.onAborted({onAbort});
-			res.onData({onDataCallback});
-
-			return gold::var();
-		};
-
-		func getRegister = [](const list& args) -> gold::var {
-			serveArgs(args, req, res);
-			auto errors = obj();
-			auto resp =
-				getTemplate(req, user::userRegister(obj(), errors));
-
-			auto d = (string)(resp);
-			res.writeHeader({"Content-Type", "text/html"});
-			return res.end({d});
-		};
-
-		func postRegister = [](const list& pArgs) -> gold::var {
-			serveArgs(pArgs, req, res);
-			std::string* buffer = new string();
-
-			func onDataCallback = [&](const list& args) -> gold::var {
-				auto req = pArgs[0].getObject<request>();
-				auto res = pArgs[1].getObject<response>();
-				auto chuck = args[0].getString();
-				auto isEnd = args[1].getBool();
-				(*buffer) = (*buffer) + chuck;
-				if (isEnd) {
-					auto d = html();
-					auto t = "text/html";
-					if (req.isWWWFormURLEncoded()) {
-						auto params = obj();
-						obj::parseURLEncoded(*buffer, params);
-						auto u = user::create(params);
-						if (u.isObject(user::getPrototype())) {
-							// Created
-							auto userO = u.getObject<user>();
-							auto sesh = session(userO);
-							auto succ = sesh.save();
-							if (succ.isError()) {
-								// TODO: Create error screen
-							} else {
-								auto url =
-									string("/") + sesh.getString("_id") + "/home";
-								res.writeHeader({"Location", url});
-								return res.writeStatus({"303 See Other"});
-							}
-						} else if (u.isObject()) {
-							// Form issue
-							auto errors = u.getObject();
-							d = getTemplate(
-								req, user::userRegister(params, errors));
-						} else if (u.isError()) {
-							d = getTemplate(req, errorPage({u}));
+						auto loggedIn =
+							user::login(userEmail, userPassword, agent);
+						if (loggedIn.isError()) {
+							res.writeStatus({"401 Unauthorized"});
+							return res.end({obj{{"error", loggedIn}}});
+						} else if (loggedIn.isList()) {
+							auto ret = loggedIn.getList();
+							auto sesh = ret[1].getObject<session>();
+							sesh.writeSession({obj{{"res", res}}});
+							return res.end({obj{{"session", sesh}}});
+						} else {
+							res.writeStatus({"401 Unauthorized"});
+							return res.end({obj{{"error", "invalid login"}}});
 						}
 					}
-
-					res.writeHeader({"Content-Type", t});
-					res.end({string(d)});
 				}
-				delete buffer;
 				return gold::var();
 			};
 
-			func onAbort = [=](const list& args) -> gold::var {
-				serveArgs(args, req, res);
-				auto error = args[0].getError();
-				gold::list content = errorPage({*error});
-				auto d = (string)getTemplate(req, content);
-				res.writeHeader({"Content-Type", "text/html"});
-				res.end({d});
-				return gold::var();
+			func onAbort = [](list dargs) -> gold::var {
+				auto req = dargs[0].getObject<request>();
+				auto res = dargs[1].getObject<response>();
+				return res.end({getTemplate(
+					req, errorPage({genericError("Aborted.")}))});
 			};
 
-			res.onAborted({onAbort});
-			res.onData({onDataCallback});
+			res.onAborted({onAbort, req});
+			res.onData({onDataCallback, req});
 
 			return gold::var();
 		};
 
-		func getOptions = [](const list& args) -> gold::var {
+		func getRegister = [](list args) -> gold::var {
 			serveArgs(args, req, res);
 			auto errors = obj();
-			auto seshId = req.getParameter({0}).getString();
-			auto found = session::findOne({obj{{"_id", seshId}}});
-			auto d = string();
-			if (found.isObject(session::getPrototype())) {
-				auto sesh = found.getObject<session>();
-				auto uVar = sesh.getUser();
-				auto u = uVar.getObject<user>();
-				if (u) {
-					d = (string)(
-						getTemplate(req, user::userOptions(u, errors)));
-				} else {
-					d = (string)(getTemplate(
+			return res.end(
+				{getTemplate(req, user::userRegister(obj(), errors))});
+		};
+
+		func postRegister = [](list pArgs) -> gold::var {
+			serveArgs(pArgs, req, res);
+
+			func onDataCallback = [](list args) -> gold::var {
+				auto data = args[0].getString();
+				auto req = args[1].getObject<request>();
+				auto res = args[2].getObject<response>();
+				if (req.isWWWFormURLEncoded()) {
+					auto params = obj();
+					obj::parseURLEncoded(data, params);
+					auto u = user::create(params);
+					if (u.isObject(user::getPrototype())) {
+						// Created
+						auto userO = u.getObject<user>();
+						auto sesh = session(userO);
+						auto agent =
+							req.getHeader({"user-agent"}).getString();
+						sesh.setString("agent", agent);
+						auto succ = sesh.save();
+						if (succ.isError()) {
+							return res.end(
+								{getTemplate(req, errorPage({succ}))});
+						} else {
+							sesh.writeSession({obj{
+								{"res", res},
+								{"redirect", "/home"},
+							}});
+							return res.end({getTemplate(
+								req, user::userRegister(params, u))});
+						}
+					} else if (u.isObject()) {
+						return res.end({getTemplate(
+							req, user::userRegister(params, u))});
+					} else if (u.isError()) {
+						return res.end({getTemplate(req, errorPage({u}))});
+					}
+				}
+
+				return res.end(
+					{getTemplate(req, user::userRegister({}, {}))});
+			};
+
+			func onAbort = [](list args) -> gold::var {
+				auto req = args[0].getObject<request>();
+				auto res = args[1].getObject<response>();
+				res.end({getTemplate(
+					req, errorPage({genericError("Aborted.")}))});
+				return gold::var();
+			};
+
+			res.onAborted({onAbort, req});
+			res.onData({onDataCallback, req});
+
+			return gold::var();
+		};
+
+		func getOptions = [](list args) -> gold::var {
+			serveArgs(args, req, res);
+			auto errors = obj();
+			auto sesh =
+				req.callMethod("getSession").getObject<session>();
+			if (sesh) {
+				auto u = req.callMethod("getUser").getObject<user>();
+				if (u)
+					return res.end(
+						{getTemplate(req, user::userOptions(u, errors))});
+			}
+
+			return req.setYield({true});
+		};
+
+		func postOptions = [](list pArgs) -> gold::var {
+			using namespace HTML;
+			serveArgs(pArgs, req, res);
+
+			func onDataCallback = [](list args) -> gold::var {
+				auto data = args[0].getString();
+				auto req = args[1].getObject<request>();
+				auto res = args[2].getObject<response>();
+				auto sesh =
+					req.callMethod("getSession").getObject<session>();
+				auto u = req.callMethod("getUser").getObject<user>();
+				if (req.isWWWFormURLEncoded()) {
+					auto params = obj();
+					obj::parseURLEncoded(data, params);
+
+					auto seshId = req.getParameter({0}).getString();
+					auto pass = params.getString("password");
+					auto confPass = params.getString("confPassword");
+					auto email = params.getString("email");
+					auto confEmail = params.getString("confEmail");
+					if (email != "" && confEmail == email)
+						u.changeEmail({email});
+					if (pass != "" && confPass == pass)
+						u.changePassword({pass});
+					params.erase("confEmail");
+					params.erase("password");
+					params.erase("confPassword");
+					u.copy(params);
+					auto resp = u.save();
+					if (resp.isError())
+						return res.end(
+							{getTemplate(req, errorPage({resp}))});
+					else
+						return res.end(
+							{getTemplate(req, user::userOptions(u, obj()))});
+				} else
+					return res.end({getTemplate(
 						req,
 						errorPage({genericError(
-							"Could not find user in session.")})));
+							"Could not parse encoded form.")}))});
+
+				return gold::var();
+			};
+
+			func onAbort = [](list args) -> gold::var {
+				auto req = args[0].getObject<request>();
+				auto res = args[1].getObject<response>();
+				res.end({getTemplate(
+					req, errorPage({genericError("Aborted")}))});
+				return gold::var();
+			};
+			auto sesh =
+				req.callMethod("getSession").getObject<session>();
+			if (sesh) {
+				auto u = req.callMethod("getUser").getObject<user>();
+				if (u) {
+					res.onAborted({onAbort, req});
+					return res.onData({onDataCallback, req});
 				}
 			}
 
-			res.writeHeader({"Content-Type", "text/html"});
-			return res.end({d});
-		};
-
-		func postOptions = [](const list& pArgs) -> gold::var {
-			using namespace HTML;
-			serveArgs(pArgs, req, res);
-			std::string* buffer = new string();
-
-			func onDataCallback = [&](const list& args) -> gold::var {
-				serveArgs(pArgs, req, res);
-				auto chuck = args[0].getString();
-				auto isEnd = args[1].getBool();
-				(*buffer) = (*buffer) + chuck;
-				if (isEnd) {
-					auto d = html();
-					auto t = "text/html";
-					if (req.isWWWFormURLEncoded()) {
-						auto params = obj();
-						obj::parseURLEncoded(*buffer, params);
-
-						auto seshId = req.getParameter({0}).getString();
-						auto found =
-							session::findOne({obj{{"_id", seshId}}});
-						if (found.isObject(session::getPrototype())) {
-							auto sesh = found.getObject<session>();
-							auto uVar = sesh.getUser();
-							auto u = uVar.getObject<user>();
-							if (u) {
-								auto pass = params.getString("password");
-								auto confPass =
-									params.getString("confPassword");
-								auto email = params.getString("email");
-								auto confEmail = params.getString("confEmail");
-								if (email != "" && confEmail == email)
-									u.changeEmail({email});
-								if (pass != "" && confPass == pass)
-									u.changePassword({pass});
-								params.erase("confEmail");
-								params.erase("password");
-								params.erase("confPassword");
-								u.copy(params);
-								auto resp = u.save();
-								if (resp.isError())
-									d = getTemplate(req, errorPage({resp}));
-								else
-									d = getTemplate(
-										req, user::userOptions(u, obj()));
-							} else
-								d = getTemplate(
-									req,
-									errorPage({genericError(
-										"Could not get user from session.")}));
-						} else
-							d = getTemplate(req, errorPage({found}));
-					}
-
-					res.writeHeader({"Content-Type", t});
-					res.end({string(d)});
-				}
-				delete buffer;
-				return gold::var();
-			};
-
-			func onAbort = [&](const list& args) -> gold::var {
-				serveArgs(pArgs, req, res);
-				auto error = args[0].getError();
-				gold::list content = errorPage({*error});
-				auto d = (string)getTemplate(req, content);
-				res.writeHeader({"Content-Type", "text/html"});
-				res.end({d});
-				return gold::var();
-			};
-
-			res.onAborted({onAbort});
-			res.onData({onDataCallback});
-
-			return gold::var();
+			return req.setYield({true});
 		};
 
 		// Session
-		serv.get({"/:sessionID/options", getOptions});
-		serv.post({"/:sessionID/options", postOptions});
-		serv.get({"/:sessionID/register", getRegister});
-		serv.post({"/:sessionID/register", postRegister});
-		serv.get({"/:sessionID/login", getLogin});
-		serv.post({"/:sessionID/login", postLogin});
-		serv.get({"/:sessionID/home", getUserHome});
+		serv.get({"/options", getOptions});
+		serv.post({"/options", postOptions});
+		serv.get({"/home", getUserHome});
 
 		// Without
 		serv.get({"/register", getRegister});
 		serv.post({"/register", postRegister});
 		serv.get({"/login", getLogin});
 		serv.post({"/login", postLogin});
+		serv.post({"/auth", postLogin});
 	}
 
-	user::user() : model(col) { setParent(getPrototype()); }
+	user::user() : model() {}
 
-	user::user(obj data) : model(col, data) {
+	user::user(obj data)
+		: model(
+				getPrototype().getObject<collection>("collection"),
+				data) {
 		setParent(getPrototype());
 	}
 
@@ -474,7 +470,9 @@ namespace gg {
 
 		if (err.size() > 0) return err;
 
-		auto existU = user::col.findOne({obj{{"email", email}}});
+		auto col =
+			getPrototype().getObject<collection>("collection");
+		auto existU = col.findOne({obj{{"email", email}}});
 		if (existU.isError())
 			return existU;
 		else if (existU.isObject())
@@ -492,8 +490,12 @@ namespace gg {
 		return u.save();
 	}
 
-	gold::var user::login(string email, string password) {
-		auto exist = user::findOne({obj{{"email", email}}});
+	gold::var user::login(
+		string email, string password, string agent) {
+		auto col =
+			getPrototype().getObject<collection>("collection");
+		auto exist = col.findOne({obj{{"email", email}}});
+		collection::setParentModel(exist, getPrototype());
 		if (exist.isError())
 			return exist;
 		else if (exist.isObject()) {
@@ -503,6 +505,7 @@ namespace gg {
 				return valid;
 			else if (valid.getBool()) {
 				auto sesh = session(u);
+				sesh.setString("agent", agent);
 				auto saved = sesh.save();
 				if (saved.isError()) return saved;
 				return gold::var(gold::list{u, sesh});
@@ -624,7 +627,7 @@ namespace gg {
 		auto fc = tolower(g[0]);
 		if (!(fc == 'n' || fc == 'f' || fc == 'm')) {
 			error =
-				"Expected gender; (n)on-binary, (f)emale, (m)ale, or "
+				"Expected gender; non-binary, female, male, or "
 				"blank";
 			return true;
 		}
@@ -739,13 +742,17 @@ namespace gg {
 	}
 
 	gold::var user::findOne(list args) {
-		auto value = user::col.findOne(args);
+		auto col =
+			getPrototype().getObject<collection>("collection");
+		auto value = col.findOne(args);
 		return collection::setParentModel(
 			value, user::getPrototype());
 	}
 
 	gold::var user::findMany(list args) {
-		auto value = user::col.findMany(args);
+		auto col =
+			getPrototype().getObject<collection>("collection");
+		auto value = col.findMany(args);
 		return collection::setParentModel(
 			value, user::getPrototype());
 	}

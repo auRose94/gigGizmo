@@ -11,13 +11,13 @@ namespace gg {
 	using namespace gold;
 	using namespace gg::bs;
 	using div = HTML::div;
-	gold::list user::userHome(session& sesh) {
+	gold::list user::userHome(session sesh) {
 		auto u = sesh.getUser().getObject<user>();
 		auto greetings =
 			string("Hello, ") + u.getString("firstName") + "!";
 		auto content = gold::list{
 			div({
-				obj{{"class", "card pageCard"}},
+				obj{{"class", "card pageCard text-light bg-dark"}},
 				div({
 					obj{{"class", "card-body"}},
 					h5({

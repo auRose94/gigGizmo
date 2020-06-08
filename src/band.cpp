@@ -29,7 +29,7 @@ namespace gg {
 		return proto;
 	}
 
-	band::band() : model(col) { setParent(getPrototype()); }
+	band::band() : model() {}
 
 	band::band(obj data) : model(col, data) {
 		setParent(getPrototype());
@@ -132,23 +132,14 @@ namespace gg {
 			if (BandID.size() == 0) BandID = sessionID;
 			auto baRes = band::findOne({obj({{"_id", BandID}})});
 			auto ba = baRes.getObject<band>();
-			auto content = gold::list();
 			if (ba)  // Found
-				content = bandIndex(ba);
-			else  // Not
-				content = errorPage({genericError("band not found.")});
+				return res.end({getTemplate(req, bandIndex(ba))});
 
-			auto resp = getTemplate(req, content);
-
-			auto d = (string)(resp);
-			res.writeHeader({"Content-Type", "text/html"});
-			return res.end({d});
+			return req.setYield({true});
 		};
 
 		func getListBands = [](const list& args) -> gold::var {
 			serveArgs(args, req, res);
-
-			auto content = gold::list();
 
 			auto seshId = req.getParameter({0}).getString();
 			auto found = session::findOne({obj{{"_id", seshId}}});
@@ -162,30 +153,19 @@ namespace gg {
 					});
 					auto opt = obj({});
 					auto resp = findMany({find, opt});
-					if (resp.isError()) {
-						auto err = resp.getError();
-						return res.end({err->what()});
+					if (!resp.isError()) {
+						auto bands = resp.getList();
+						return res.end(
+							{getTemplate(req, bandList(u, bands))});
 					}
-					auto bands = resp.getList();
-					content = bandList(u, bands);
-				} else
-					content = errorPage(
-						{genericError("User not found in session.")});
-			} else
-				content =
-					errorPage({genericError("Session not found.")});
+				}
+			}
 
-			auto resp = getTemplate(req, content);
-
-			auto d = (string)(resp);
-			res.writeHeader({"Content-Type", "text/html"});
-			return res.end({d});
+			return req.setYield({true});
 		};
 
 		func getCreateBand = [](const list& args) -> gold::var {
 			serveArgs(args, req, res);
-
-			auto content = gold::list();
 
 			auto seshId = req.getParameter({0}).getString();
 			auto found = session::findOne({obj{{"_id", seshId}}});
@@ -194,176 +174,139 @@ namespace gg {
 				auto uVar = sesh.getUser();
 				auto u = uVar.getObject<user>();
 				if (u)
-					content = bandCreate(u, obj{}, obj{});
-				else
-					content = errorPage(
-						{genericError("User not found in session.")});
-			} else
-				content =
-					errorPage({genericError("Session not found.")});
+					return res.end(
+						{getTemplate(req, bandCreate(u, obj{}, obj{}))});
+			}
 
-			auto resp = getTemplate(req, content);
-
-			auto d = (string)(resp);
-			res.writeHeader({"Content-Type", "text/html"});
-			return res.end({d});
+			return req.setYield({true});
 		};
 
 		func putBand = [](const list& pArgs) -> gold::var {
 			using namespace HTML;
 			serveArgs(pArgs, req, res);
-			std::string* buffer = new string();
+			session sesh;
+			user u;
 
 			func onDataCallback = [&](const list& args) -> gold::var {
-				serveArgs(pArgs, req, res);
-				auto chuck = args[0].getString();
-				auto isEnd = args[1].getBool();
-				(*buffer) = (*buffer) + chuck;
-				if (isEnd) {
-					auto d = html();
-					auto t = "text/html";
-					if (req.isWWWFormURLEncoded()) {
-						auto params = obj();
-						obj::parseURLEncoded(*buffer, params);
+				auto data = args[0].getString();
+				auto req = args[1].getObject<request>();
+				auto res = args[2].getObject<response>();
 
-						auto seshId = req.getParameter({0}).getString();
-						auto bandId = req.getParameter({1}).getString();
-						auto found =
-							session::findOne({obj{{"_id", seshId}}});
-						if (found.isObject(session::getPrototype())) {
-							auto sesh = found.getObject<session>();
-							auto uVar = sesh.getUser();
-							auto u = uVar.getObject<user>();
-							if (u) {
-								auto baRet =
-									band::findOne({obj{{"_id", bandId}}});
-								if (baRet.isError()) {
-									d = getTemplate(req, errorPage({baRet}));
-								} else {
-									auto ba = baRet.getObject<band>();
-									ba.copy(params);
-									// TODO: Do more checks
-									auto saved = ba.save();
-									if (!saved.isError())
-										d = getTemplate(
-											req, bandOptions(u, ba, obj{}));
-									else
-										d = getTemplate(req, errorPage({saved}));
-								}
-							} else
-								d = getTemplate(
-									req,
-									errorPage({genericError(
-										"Could not get user from session.")}));
-						} else if (found.isError())
-							d = getTemplate(req, errorPage({found}));
+				if (req.isWWWFormURLEncoded()) {
+					auto params = obj();
+					obj::parseURLEncoded(data, params);
+
+					auto bandId = req.getParameter({1}).getString();
+					auto baRet = band::findOne({obj{{"_id", bandId}}});
+					if (baRet.isError()) {
+						return res.end(
+							{getTemplate(req, errorPage({baRet}))});
+					} else {
+						auto ba = baRet.getObject<band>();
+						ba.copy(params);
+						// TODO: Do more checks
+						auto saved = ba.save();
+						if (!saved.isError())
+							return res.end(
+								{getTemplate(req, bandOptions(u, ba, obj{}))});
+						else
+							return res.end(
+								{getTemplate(req, errorPage({saved}))});
 					}
-
-					res.writeHeader({"Content-Type", t});
-					res.end({string(d)});
 				}
-				delete buffer;
-				return gold::var();
+
+				return res.end({getTemplate(
+					req, errorPage({genericError(
+								 "Failed to parse encoded form.")}))});
 			};
 
 			func onAbort = [&](const list& args) -> gold::var {
-				serveArgs(pArgs, req, res);
-				auto error = args[0].getError();
-				gold::list content = errorPage({*error});
-				auto d = (string)getTemplate(req, content);
-				res.writeHeader({"Content-Type", "text/html"});
-				res.end({d});
-				return gold::var();
+				auto req = args[0].getObject<request>();
+				auto res = args[1].getObject<response>();
+				return res.end({getTemplate(
+					req, errorPage({genericError("Aborted.")}))});
 			};
 
-			res.onAborted({onAbort});
-			res.onData({onDataCallback});
+			auto seshId = req.getParameter({0}).getString();
+			auto found = session::findOne({obj{{"_id", seshId}}});
+			if (found.isObject(session::getPrototype())) {
+				sesh = found.getObject<session>();
+				auto uVar = sesh.getUser();
+				u = uVar.getObject<user>();
+				if (u) {
+					res.onAborted({onAbort, req});
+					return res.onData({onDataCallback, req});
+				}
+			}
 
-			return gold::var();
+			return req.setYield({true});
 		};
 
 		func postCreateBand = [](const list& pArgs) -> gold::var {
 			serveArgs(pArgs, req, res);
-			std::string* buffer = new string();
+			session sesh;
+			user u;
 
-			func onDataCallback = [=](const list& args) -> gold::var {
-				serveArgs(args, req, res);
-				auto chuck = args[0].getString();
-				auto isEnd = args[1].getBool();
-				(*buffer) = (*buffer) + chuck;
-				if (isEnd) {
-					auto d = html();
-					auto t = "text/html";
-					if (req.isWWWFormURLEncoded()) {
-						auto params = obj();
-						obj::parseURLEncoded(*buffer, params);
-						auto seshId = req.getParameter({0}).getString();
-						auto BandId = req.getParameter({1}).getString();
-						auto found =
-							session::findOne({obj{{"_id", seshId}}});
-						if (found.isObject(session::getPrototype())) {
-							auto sesh = found.getObject<session>();
-							auto uVar = sesh.getUser();
-							auto u = uVar.getObject<user>();
-							if (u) {
-								auto baRes =
-									band::findOne({obj({{"_id", BandId}})});
-								if (baRes.isError())
-									d = getTemplate(req, errorPage({baRes}));
-								else if (baRes.isObject()) {
-									auto ba = baRes.getObject<band>();
-									ba.copy(params);
-									auto resp = ba.save();
-									// TODO: Do check, show errors
-									if (resp.isError())
-										d = getTemplate(req, errorPage({resp}));
-									else
-										d = getTemplate(
-											req, bandCreate(u, ba, obj{}));
-								}
-							} else
-								d = getTemplate(
-									req,
-									errorPage({genericError(
-										"Could not get user from session.")}));
-						} else
-							d = getTemplate(req, errorPage({found}));
-					} else
-						d = getTemplate(
-							req,
-							errorPage({genericError(
-								"Expected URL Form encoded content.")}));
+			func onDataCallback = [&](const list& args) -> gold::var {
+				auto data = args[0].getString();
+				auto req = args[1].getObject<request>();
+				auto res = args[2].getObject<response>();
 
-					res.writeHeader({"Content-Type", t});
-					res.end({string(d)});
+				if (req.isWWWFormURLEncoded()) {
+					auto params = obj();
+					obj::parseURLEncoded(data, params);
+					auto BandId = req.getParameter({1}).getString();
+					auto ban = band(params);
+					ban.setList("owners", list({u.getString("_id")}));
+					auto resp = ban.save();
+					// TODO: Do check, show errors
+					if (resp.isError())
+						return res.end(
+							{getTemplate(req, errorPage({resp}))});
+					else {
+						auto bId = ban.getString("_id");
+						auto sId = sesh.getString("_id");
+						auto url = "/band/" + bId;
+						res.writeHeader({"Location", url});
+						res.writeStatus({"303 See Other"});
+						return res.end({getTemplate(
+							req, band::bandCreate(u, obj{}, obj{}))});
+					}
 				}
-				delete buffer;
-				return gold::var();
+
+				return res.end({getTemplate(
+					req,
+					errorPage({genericError(
+						"Expected URL Form encoded content.")}))});
 			};
 
 			func onAbort = [=](const list& args) -> gold::var {
-				serveArgs(args, req, res);
-				auto error = args[0].getError();
-				gold::list content = errorPage({*error});
-				auto d = (string)getTemplate(req, content);
-				res.writeHeader({"Content-Type", "text/html"});
-				res.end({d});
-				return gold::var();
+				auto req = args[0].getObject<request>();
+				auto res = args[1].getObject<response>();
+				return res.end({getTemplate(
+					req, errorPage({genericError("Aborted.")}))});
 			};
 
-			res.onAborted({onAbort});
-			res.onData({onDataCallback});
+			auto seshId = req.getParameter({0}).getString();
+			auto found = session::findOne({obj{{"_id", seshId}}});
+			if (found.isObject(session::getPrototype())) {
+				sesh = found.getObject<session>();
+				u = sesh.getUser().getObject<user>();
+				if (u) {
+					res.onAborted({onAbort, req});
+					return res.onData({onDataCallback, req});
+				}
+			}
 
-			return gold::var();
+			return req.setYield({true});
 		};
 
-		serv.get({R"(/band/:bandID)", getBand});
-		serv.get({R"(/:sessionID/band/:bandID)", getBand});
-		serv.get({R"(/:sessionID/list/band)", getListBands});
-		serv.get({R"(/:sessionID/band)", getCreateBand});
+		serv.get({"/band/:bandID", getBand});
+		serv.get({"/list/band", getListBands});
+		serv.get({"/band", getCreateBand});
 
-		serv.post({R"(/:sessionID/band)", postCreateBand});
-		serv.put({R"(/:sessionID/band/:bandID)", putBand});
+		serv.post({"/band", postCreateBand});
+		serv.put({"/band/:bandID", putBand});
 	}
 
 	gold::var band::findOne(list args) {

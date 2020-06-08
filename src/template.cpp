@@ -9,12 +9,12 @@ namespace gg {
 	using div = HTML::div;
 
 	html getTemplateEx(
-		user& u, session& s, string path, gold::list content,
+		user u, session s, string path, gold::list content,
 		gold::list header) {
 		using namespace HTML;
 		auto sessionID = s ? s.getID() : "";
-		auto rootUrl = string();
-		if (s) rootUrl = string("/") + sessionID;
+		auto q = string();
+		if (s && !s.getBool("useCookies")) q = "?s=" + sessionID;
 		auto headEl = head({
 			obj{{"lang", "en"}},
 			title({"GigGizmo"}),
@@ -47,11 +47,14 @@ namespace gg {
 			}}),
 			link({obj{
 				{"rel", "stylesheet"},
-				{"href", "/css/baseStyle.css"},
+				{"href", "/css/main/baseStyle.css"},
 			}}),
-			script({obj{
-				{"src", "/js/bootstrap/bootstrap.bundle.min.js"},
-			}}),
+			script({obj{{"src", "/js/main/jquery-3.5.1.js"}}}),
+			script({obj{{"src", "/js/main/luxon.min.js"}}}),
+			script({obj{{"src", "/js/fontawesome/js/all.min.js"}}}),
+			script(
+				{obj{{"src", "/js/bootstrap/bootstrap.bundle.min.js"},
+						 {"defer", true}}}),
 		});
 		headEl += header;
 		auto bodyEl = body({
@@ -64,7 +67,7 @@ namespace gg {
 				a({
 					obj{
 						{"class", "navbar-brand"},
-						{"href", rootUrl + "/"},
+						{"href", "/" + q},
 					},
 					img({
 						obj({
@@ -132,13 +135,12 @@ namespace gg {
 		request req, gold::list content, gold::list header) {
 		using namespace HTML;
 		auto path = req.getString("path");
-		auto sessionID = req.getParameter({0}).getString();
-		auto seshVar =
-			session::findOne({obj{{"_id", sessionID}}});
-		auto sesh = seshVar.getObject<session>();
-		auto uVar = sesh ? sesh.getUser() : gold::var();
-		auto u = user();
-		if (uVar.isObject()) uVar.returnObject<user>(u);
+		auto sesh =
+			req.callMethod("getSession").getObject<session>();
+		user u;
+		if (!sesh.isExpired()) {
+			u = req.callMethod("getUser").getObject<user>();
+		}
 		return getTemplateEx(u, sesh, path, content, header);
 	}  // namespace gg
 }  // namespace gg

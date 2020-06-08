@@ -12,17 +12,10 @@ namespace gg {
 			using namespace HTML;
 			auto req = args[0].getObject<request>();
 			auto res = args[1].getObject<response>();
-			auto resp = getTemplate(req, {p({"Hello world 2.0"})});
-
-			auto d = (string)(resp);
-			res.writeHeader({"Content-Type", "text/html"});
-			return res.end({d});
+			return res.end(
+				{getTemplate(req, {p({"Hello world 2.0"})})});
 		};
 
-		// Session
 		serv.get({"/", getIndex});
-
-		// Without
-		serv.get({"/:sessionID/", getIndex});
 	}
 }  // namespace gg

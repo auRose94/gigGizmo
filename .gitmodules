@@ -1,3 +1,9 @@
 [submodule "3rdParty/bootstrap"]
 	path = 3rdParty/bootstrap
 	url = https://github.com/twbs/bootstrap.git
+[submodule "3rdParty/Croppie"]
+	path = 3rdParty/Croppie
+	url = https://github.com/Foliotek/Croppie.git
+[submodule "3rdParty/bootstrap-table"]
+	path = 3rdParty/bootstrap-table
+	url = https://github.com/wenzhixin/bootstrap-table.git

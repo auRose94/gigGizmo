@@ -38,7 +38,7 @@ namespace gg {
 		auto gender = data.getString("gender");
 		auto content = gold::list({
 			div({
-				obj{{"class", "card pageCard"}},
+				obj{{"class", "card pageCard text-light bg-dark"}},
 				div({
 					obj{{"class", "card-body"}},
 					h5({
@@ -67,21 +67,21 @@ namespace gg {
 								})}),
 						}),
 						row({
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"text", "firstName", "First", false,
 								errs.getString("firstName"),
 								obj{{"value", data.getString("firstName")}})}),
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"text", "midName", "Middle", false,
 								errs.getString("midName"),
 								obj{{"value", data.getString("midName")}})}),
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"text", "lastName", "Last", false,
 								errs.getString("lastName"),
 								obj{{"value", data.getString("lastName")}})}),
 						}),
 						row({
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"tel", "phone", "Phone", false,
 								errs.getString("phone"),
 								{
@@ -90,7 +90,7 @@ namespace gg {
 									{"autocorrect", "on"},
 									{"value", data.getString("phone")},
 								})}),
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"date", "birthday", "Birthday", false,
 								errs.getString("birthday"),
 								obj{{"value", transformBirthday(data.getString(
@@ -98,57 +98,59 @@ namespace gg {
 							bs::col({formSelect(
 								"gender", "Gender", false, {},
 								{
-									formSelectOption("", "", gender == ""),
+									formSelectOption(
+										"(Blank)", "", gender == ""),
 									formSelectOption(
 										"Non-Binary", "n", gender == "n"),
+									formSelectOption("Trans", "t", gender == "t"),
 									formSelectOption(
 										"Female", "f", gender == "f"),
 									formSelectOption("Male", "m", gender == "m"),
 								})}),
 						}),
 						row({
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"text", "country", "Country", false,
 								errs.getString("country"),
 								obj{{"value", data.getString("country")}})}),
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"text", "zone", "State", false,
 								errs.getString("zone"),
 								obj{{"value", data.getString("zone")}})}),
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"text", "city", "City", false,
 								errs.getString("city"),
 								obj{{"value", data.getString("city")}})}),
 						}),
 						row({
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"text", "address1", "Address 1", false,
 								errs.getString("address1"),
 								obj{{"value", data.getString("address1")}})}),
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"text", "address2", "Address 2", false,
 								errs.getString("address2"),
 								obj{{"value", data.getString("address2")}})}),
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"text", "zip", "ZIP", false,
 								errs.getString("zip"),
 								obj{{"value", data.getString("zip")}})}),
 						}),
 						row({
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"email", "email", "Email", false,
 								errs.getString("email"),
 								obj{{"value", data.getString("email")}})}),
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"email", "confEmail", "Confirm", false,
 								errs.getString("confEmail"),
 								obj{{"value", data.getString("confEmail")}})}),
 						}),
 						row({
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"password", "password", "Password", false,
 								errs.getString("password"))}),
-							bs::col({formInput(
+							bs::col({formInputRow(
 								"password", "confPassword", "Confirm", false,
 								errs.getString("confPassword"))}),
 						}),

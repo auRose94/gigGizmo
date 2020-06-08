@@ -4,14 +4,17 @@
 
 #include "user.hpp"
 
-using list = gold::list;
-
 namespace gg {
+	using list = gold::list;
+	using var = gold::var;
 	using namespace gold;
 
 	struct session : public model {
 	 protected:
 		static collection col;
+
+		static var getSession(list args);
+		static var getSeshUser(list args);
 
 	 public:
 		static object& getPrototype();
@@ -19,13 +22,14 @@ namespace gg {
 		session(object data);
 		session(user user);
 
-		gold::var isExpired(list args = {});
-		gold::var getUser(list args = {});
-		gold::var reset(list args = {});
-		gold::var save(list args = {});
+		var isExpired(list args = {});
+		var getUser(list args = {});
+		var reset(list args = {});
+		var save(list args = {});
+		var writeSession(list args);
 
 		static void setRoutes(database, server);
-		static gold::var findOne(list args);
+		static var findOne(list args);
 	};
 
 	void setSessionRoute(database db, server serv);

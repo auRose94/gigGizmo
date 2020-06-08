@@ -7,6 +7,9 @@
 
 namespace gg {
 	using namespace gold;
+	using string = std::string;
+	using list = gold::list;
+	using var = gold::var;
 
 	struct band : public model {
 	 public:
@@ -15,20 +18,19 @@ namespace gg {
 		band();
 		band(object data);
 
-		gold::var addOwners(list args);
-		gold::var removeOwners(list args);
-		gold::var isOwner(list args);
-		gold::var getOwners(list args);
+		var addOwners(list args);
+		var removeOwners(list args);
+		var isOwner(list args);
+		var getOwners(list args);
 
-		static gold::list bandCreate(user u, obj data, obj errs);
-		static gold::list bandOptions(user u, obj data, obj errs);
-		static gold::list bandFind(obj data, obj errs);
-		static gold::list bandList(
-			obj filter, gold::list results);
-		static gold::list bandIndex(band& b);
+		static list bandCreate(user u, obj data, obj errs);
+		static list bandOptions(user u, obj data, obj errs);
+		static list bandFind(obj data, obj errs);
+		static list bandList(obj filter, list results);
+		static list bandIndex(band b);
 
 		static void setRoutes(database, server);
-		static gold::var findOne(list args);
-		static gold::var findMany(list args);
+		static var findOne(list args);
+		static var findMany(list args);
 	};
 }  // namespace gg

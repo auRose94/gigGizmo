@@ -6,41 +6,41 @@
 namespace gg {
 	using string = std::string;
 	using list = gold::list;
+	using var = gold::var;
 	using namespace gold;
 
 	struct user : public model {
 	 public:
 		static std::map<string, string> nameMap;
 		static object& getPrototype();
-		static collection col;
 		user();
 		user(object data);
 
-		gold::var checkPassword(list args);
-		gold::var changePassword(list args);
-		gold::var changeEmail(list args);
-		gold::var getIcon(list args);
-		gold::var addFriend(list args);
-		gold::var removeFriend(list args);
-		gold::var blockUser(list args);
-		gold::var deleteUser(list args);
+		var checkPassword(list args);
+		var changePassword(list args);
+		var changeEmail(list args);
+		var getIcon(list args);
+		var addFriend(list args);
+		var removeFriend(list args);
+		var blockUser(list args);
+		var deleteUser(list args);
 
-		static gold::var generateHash(string value, string salt);
+		static var generateHash(string value, string salt);
 		static void setRoutes(database, server);
-		static gold::var create(object data);
-		static gold::var login(string email, string password);
+		static var create(object data);
+		static var login(string email, string password, string agent);
 
 		// Utilities
 		static string transformBirthday(string value);
 
 		// Site rendering
-		static gold::list userHome(struct session& sesh);
-		static gold::list userLogin(
+		static list userHome(struct session sesh);
+		static list userLogin(
 			string response = "",
 			string emailError = "",
 			string passwordError = "");
-		static gold::list userRegister(obj data, object errs);
-		static gold::list userOptions(obj data, object errs);
+		static list userRegister(obj data, object errs);
+		static list userOptions(obj data, object errs);
 
 		// Validation
 		static bool invalidEmail(string email, string& error);
@@ -61,8 +61,8 @@ namespace gg {
 		static bool invalidIcon(string id, string& error);
 		static bool invalidUserType(string t, string& error);
 
-		static gold::var findOne(list args);
-		static gold::var findMany(list args);
+		static var findOne(list args);
+		static var findMany(list args);
 	};
 
 }  // namespace gg

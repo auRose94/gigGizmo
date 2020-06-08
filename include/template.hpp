@@ -11,7 +11,7 @@ namespace gg {
 	using namespace HTML;
 
 	html getTemplateEx(
-		user& u, session& s, string path, gold::list content,
+		user u, session s, string path, gold::list content,
 		gold::list header = gold::list());
 	html getTemplate(
 		request req, gold::list content,
