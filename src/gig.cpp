@@ -1,55 +1,103 @@
+#include "gig.hpp"
+
+#include <file.hpp>
+#include <filesystem>
+#include <image.hpp>
+
+#include "band.hpp"
+#include "error.hpp"
+#include "session.hpp"
+#include "template.hpp"
+#include "types.hpp"
+#include "user.hpp"
 #include "venue.hpp"
 
-#include "error.hpp"
-#include "file.hpp"
-#include "template.hpp"
-#include "upload.hpp"
-#include "user.hpp"
-
 namespace gg {
-	using obj = gold::obj;
+	using div = gold::HTML::div;
+	namespace fs = std::filesystem;
 
-	std::map<string, string> venue::nameMap =
+	struct tm parseDateTime(string& date, string& time) {
+		auto utm = time_t{std::time(NULL)};
+		struct tm tm = *localtime(&utm);
+
+		auto y = stoi(date.substr(0, 4));
+		auto ms = date[6] == '0' ? stoi(date.substr(6, 1))
+														 : stoi(date.substr(5, 2));
+		auto ds = date[9] == '0' ? stoi(date.substr(9, 1))
+														 : stoi(date.substr(8, 2));
+
+		auto h = stoi(time.substr(0, 2));
+		auto m = stoi(time.substr(3, 2));
+
+		tm.tm_year = y - 1900;
+		tm.tm_mon = ms;
+		tm.tm_mday = ds;
+		tm.tm_hour = h;
+		tm.tm_min = m;
+		tm.tm_sec = 0;
+
+		return tm;
+	}
+
+	std::map<string, string> gig::nameMap =
 		std::map<string, string>({
-			{"name", "Name"},
-			{"contact", "Email Contact"},
-			{"shortDesc", "Short Description"},
-			{"longDesc", "Long Description"},
-			{"accent", "Accent Color"},
-			{"icon", "Icon"},
-			{"location", "Location"},
-			{"tags", "Tags"},
-			{"uploads", "Uploads"},
-			{"owners", "Owners"},
+			{"desc", "Description"},
+			{"bands", "Bands"},
+			{"venue", "Venue"},
+			{"startTime", "Start Time"},
+			{"endTime", "End Time"},
 			{"hide", "Hide"},
+			{"owners", "Owners"},
 		});
 
-	obj& venue::getPrototype() {
-		static auto proto = obj(initList{
-			{"name", ""},
-			{"contact", ""},
-			{"shortDesc", ""},
-			{"longDesc", ""},
-			{"accent", ""},
-			{"icon", ""},
-			{"location", obj()},
-			{"tags", list()},
-			{"uploads", list()},
-			{"owners", list()},
+	object& gig::getPrototype() {
+		static auto proto = obj({
+			{"desc", ""},
+			{"bands", var()},
+			{"venue", var()},
+			{"startTime", 0},
+			{"endTime", 0},
 			{"hide", false},
+			{"owners", gold::var(gold::list())},
 			{"proto", model::getPrototype()},
 		});
 		return proto;
 	}
 
-	venue::venue() : model() {}
+	gig::gig() : model() {}
 
-	venue::venue(obj data)
-		: model(getPrototype().getObject<collection>("col"), data) {
-		setParent(getPrototype());
+	gig::gig(object data) : model() {
+		copy(data);
+		setParent(gig::getPrototype());
+		auto date = getString("date");
+		auto start = getString("startTime");
+		auto end = getString("endTime");
+		if (date.length() > 0) {
+			if (start.length() > 0) {
+				auto startTime = parseDateTime(date, start);
+				auto uST = mktime(&startTime);
+				// cout << asctime(&startTime) << endl;
+				setInt64("startTime", uST * 1000);
+			}
+			if (end.length() > 0) {
+				auto endTime = parseDateTime(date, end);
+				auto uET = mktime(&endTime);
+				// cout << asctime(&endTime) << endl;
+				setInt64("endTime", uET * 1000);
+			}
+			erase("date");
+		}
+
+		if (getType("bands") == typeString) {
+			auto bs =
+				file::parseJSON(getStringView("bands")).getList();
+			setList("bands", bs);
+		}
+		erase("venueName");
+		erase("bandNames");
 	}
 
-	gold::var venue::addOwners(list args) {
+	var gig::addOwners(list args) {
 		auto owners = getList("owners");
 		if (owners)
 			for (auto it = args.begin(); it != args.end(); ++it) {
@@ -65,7 +113,7 @@ namespace gg {
 		return gold::var();
 	}
 
-	gold::var venue::removeOwners(list args) {
+	var gig::removeOwners(list args) {
 		auto owners = getList("owners");
 		if (owners)
 			for (auto it = args.begin(); it != args.end(); ++it) {
@@ -83,7 +131,7 @@ namespace gg {
 		return gold::var();
 	}
 
-	gold::var venue::isOwner(list args) {
+	var gig::isOwner(list args) {
 		auto owners = getList("owners");
 		if (args.size() > 1) {
 			auto ret = gold::list();
@@ -125,58 +173,54 @@ namespace gg {
 		return false;
 	}
 
-	gold::var venue::getOwners(list args) {
+	var gig::getOwners(list args) {
 		auto owners = getList("owners");
-		return user::findMany({obj{
-			{"_id", owners},
-		}});
+		auto returns = list({});
+		auto criteria = obj{{"_id", owners}};
+		returns += user::findMany({criteria}).getList();
+		returns += venue::findMany({criteria}).getList();
+		returns += band::findMany({criteria}).getList();
+		return returns;
 	}
 
-	var venue::save(list args) {
-		auto iconData = getBinary("icon");
-		erase("icon");
+	var gig::save(list args) {
+		// TODO: Check if valid before saving
+		// TODO: Convert band/venue object to ids
 		auto saved = model::save(args);
 		if (saved.isError()) return saved;
-		if (iconData.size() > 0) {
-			auto owners = list(getList("owners"));
-			auto id = getString("_id");
-			if (id.size() > 0) owners.pushString(id);
-			auto icon =
-				upload({{"src", iconData}, {"owners", owners}});
-			auto iconSaved = icon.save();
-			if (iconSaved.isError()) return iconSaved;
-			setString("icon", icon.getString("_id"));
-			saved = model::save(args);
-			if (saved.isError()) return saved;
-		}
 		return *this;
 	}
 
-	void venue::setRoutes(database db, server serv) {
-		auto colRes = db.getCollection({"venue"});
+	void gig::setRoutes(database db, server serv) {
+		auto colRes = db.getCollection({"gig"});
 		if (!colRes.isObject())
-			cerr << "Could not get venue collection" << endl;
+			cerr << "Could not get gig collection" << endl;
 		getPrototype().setObject(
 			"col", colRes.getObject<collection>());
+		auto cacheControl = serv.getString("cacheControl");
 
-		func getVenue = [](list args) -> gold::var {
-			using namespace HTML;
+		func getGig = [](list args) -> gold::var {
 			serveArgs(args, req, res);
+
+			auto id = req.getParameter({0}).getString();
+			auto item =
+				gig::findOne({obj({{"_id", id}})}).getObject<gig>();
+
 			auto sesh =
 				req.callMethod("getSession").getObject<session>();
 			auto u = req.callMethod("getUser").getObject<user>();
-			auto itemID = req.getParameter({0}).getString();
-			auto itemRes = venue::findOne({obj({{"_id", itemID}})});
-			auto item = itemRes.getObject<venue>();
-			if (item) {  // Found
+			if (req.acceptingJSON()) {
+				return res.end({item});
+			} else if (req.acceptingHTML()) {
 				return res.end(
-					{getTemplate(req, venue::venueIndex(sesh, u, item))});
+					{getTemplate(req, gig::gigIndex(sesh, u, item))});
 			}
+			return var();
 
 			return req.setYield({true});
 		};
 
-		func getListVenues = [](list args) -> gold::var {
+		func getListGigs = [](list args) -> gold::var {
 			serveArgs(args, req, res);
 
 			auto sesh =
@@ -184,18 +228,21 @@ namespace gg {
 			if (sesh) {
 				auto u = req.callMethod("getUser").getObject<user>();
 				if (u) {
-					auto find =
-						obj{{"owners", obj{{"$in", list({u.getID()})}}}};
+					auto find = obj{
+						{"owners", obj{{"$in", list({u.getID()})}}},
+					};
 					auto opt = obj({});
-					auto resp = venue::findMany({find, opt});
+					auto resp = gig::findMany({find, opt});
 					if (req.acceptingJSON()) {
 						if (resp.isError()) {
-							auto e = (string)*resp.getError();
-							return res.end({obj{{"error", e}}});
+							return res.end(
+								{obj{{"error", (string)*resp.getError()}}});
 						} else if (resp.isList()) {
 							auto l = resp.getList();
-							auto j =
-								obj{{"total", l.size()}, {"rows", l}}.getJSON();
+							auto j = obj{
+								{"total", l.size()},
+								{"rows", l},
+							};
 							return res.end({j});
 						}
 					} else if (req.acceptingHTML()) {
@@ -206,7 +253,7 @@ namespace gg {
 						} else {
 							auto items = resp.getList();
 							return res.end({getTemplate(
-								req, venue::venueList(sesh, u, {}, items))});
+								req, gig::gigList(sesh, u, {}, items))});
 						}
 					}
 				}
@@ -215,58 +262,10 @@ namespace gg {
 			return req.setYield({true});
 		};
 
-		func getFindVenues = [](list args) -> gold::var {
-			serveArgs(args, req, res);
-
-			auto sesh =
-				req.callMethod("getSession").getObject<session>();
-			auto u = user();
-			if (sesh) u = req.callMethod("getUser").getObject<user>();
-			auto query = object();
-			parseURLEncoded(req.getQuery(), query);
-			query.erase("s");
-			auto opt = obj({});
-			auto found = venue::findMany({query, opt});
-			if (req.acceptingJSON()) {
-				if (found.isError()) {
-					return res.end(
-						{obj{{"error", (string)*found.getError()}}});
-				} else if (found.isList()) {
-					return res.end({found});
-				}
-			} else if (req.acceptingHTML()) {
-				if (found.isError()) {
-					auto err = found.getError();
-					return res.end({getTemplate(req, errorPage({*err}))});
-				} else if (found.isList()) {
-					auto venues = found.getList();
-					return res.end({getTemplate(
-						req, venue::venueFind(sesh, u, query, venues))});
-				}
-			}
-
-			return req.setYield({true});
-		};
-
-		func getCreateVenue = [](list args) -> gold::var {
-			serveArgs(args, req, res);
-
-			auto sesh =
-				req.callMethod("getSession").getObject<session>();
-			if (sesh) {
-				auto u = req.callMethod("getUser").getObject<user>();
-				if (u)
-					return res.end({getTemplate(
-						req, venue::venueCreate(sesh, u, obj{}, obj{}))});
-			}
-
-			return req.setYield({true});
-		};
-
-		func putVenue = [](const list& pArgs) -> gold::var {
+		func putGig = [](const list& pArgs) -> gold::var {
 			using namespace HTML;
 			serveArgs(pArgs, req, res);
-			auto venueId = req.getParameter({1}).getString();
+			auto itemId = req.getParameter({1}).getString();
 
 			func onDataCallback = [=](list args) -> gold::var {
 				auto data = args[0].getString();
@@ -279,21 +278,20 @@ namespace gg {
 					auto params = obj();
 					obj::parseURLEncoded(data, params);
 
-					auto itemRet =
-						venue::findOne({obj{{"_id", venueId}}});
+					auto itemRet = gig::findOne({obj{{"_id", itemId}}});
 					if (!itemRet.isError()) {
-						auto item = itemRet.getObject<venue>();
+						auto item = itemRet.getObject<gig>();
 						item.copy(params);
 						auto saved = item.save();
 						if (!saved.isError())
-							return res.end({getTemplate(
-								req, venueOptions(sesh, u, item))});
+							return res.end(
+								{getTemplate(req, gigOptions(sesh, u, item))});
 						else
 							return res.end(
 								{getTemplate(req, errorPage({saved}))});
 					} else
 						return res.end({getTemplate(
-							req, errorPage({"Venue not found."}))});
+							req, errorPage({"Gig not found."}))});
 				} else
 					return res.end({getTemplate(
 						req,
@@ -322,7 +320,45 @@ namespace gg {
 			return req.setYield({true});
 		};
 
-		func postCreateVenue = [](list pArgs) -> gold::var {
+		func getFindGigs = [](list args) -> gold::var {
+			serveArgs(args, req, res);
+
+			auto sesh =
+				req.callMethod("getSession").getObject<session>();
+			auto u = user();
+			if (sesh) u = req.callMethod("getUser").getObject<user>();
+			auto searchParams = obj({});
+			auto find = obj({});
+			auto opt = obj({});
+			auto found = gig::findMany({find, opt});
+			if (found.isError()) {
+				auto err = found.getError();
+				return res.end({getTemplate(req, errorPage({*err}))});
+			} else if (found.isList()) {
+				auto items = found.getList();
+				return res.end({getTemplate(
+					req, gig::gigFind(sesh, u, searchParams, items))});
+			}
+
+			return req.setYield({true});
+		};
+
+		func getCreateGig = [](const list& args) -> gold::var {
+			serveArgs(args, req, res);
+
+			auto sesh =
+				req.callMethod("getSession").getObject<session>();
+			if (sesh) {
+				auto u = req.callMethod("getUser").getObject<user>();
+				if (u)
+					return res.end({getTemplate(
+						req, gig::gigCreate(sesh, u, obj{}, obj{}))});
+			}
+
+			return req.setYield({true});
+		};
+
+		func postCreateGig = [](const list& pArgs) -> gold::var {
 			serveArgs(pArgs, req, res);
 
 			func onDataCallback = [](list args) -> gold::var {
@@ -335,17 +371,17 @@ namespace gg {
 				if (req.isWWWFormURLEncoded()) {
 					auto params = obj();
 					obj::parseURLEncoded(data, params);
-					auto ven = venue(params);
-					ven.setList("owners", list({u.getString("_id")}));
-					auto resp = ven.save();
+					auto item = gig(params);
+					item.setList("owners", list({u.getString("_id")}));
+					auto resp = item.save();
 					// TODO: Do check, show errors
 					if (!resp.isError()) {
-						auto itemId = ven.getString("_id");
-						auto url = "/venue/" + itemId;
+						auto itemId = item.getString("_id");
+						auto url = "/gig/" + itemId;
 						sesh.writeSession(
 							{obj{{"res", res}, {"redirect", url}}});
 						res.end({getTemplate(
-							req, venue::venueCreate(sesh, u, obj{}, obj{}))});
+							req, gig::gigCreate(sesh, u, obj{}, obj{}))});
 					} else
 						res.end({getTemplate(req, errorPage({resp}))});
 				} else
@@ -379,30 +415,28 @@ namespace gg {
 			return req.setYield({true});
 		};
 
-		serv.get({"/venue/:venueID", getVenue});
-		serv.get({"/find/venue", getFindVenues});
-		serv.get({"/find/venue.json", getFindVenues});
-		serv.get({"/list/venue", getListVenues});
-		serv.get({"/list/venue.json", getListVenues});
-		serv.get({"/venue", getCreateVenue});
+		serv.get({"/find/gig", getFindGigs});
+		serv.get({"/list/gig", getListGigs});
+		serv.get({"/list/gig.json", getListGigs});
+		serv.get({"/gig/:gigID", getGig});
+		serv.get({"/gig", getCreateGig});
 
-		serv.post({"/venue", postCreateVenue});
-		serv.put({"/venue/:venueID", putVenue});
+		serv.post({"/gig", postCreateGig});
+		serv.put({"/gig/:gigID", putGig});
 	}
 
-	gold::var venue::findOne(list args) {
-		auto col =
-			venue::getPrototype().getObject<collection>("col");
+	var gig::findOne(list args) {
+		auto col = gig::getPrototype().getObject<collection>("col");
 		auto value = col.findOne(args);
 		return collection::setParentModel(
-			value, venue::getPrototype());
+			value, gig::getPrototype());
 	}
 
-	gold::var venue::findMany(list args) {
-		auto col =
-			venue::getPrototype().getObject<collection>("col");
+	var gig::findMany(list args) {
+		auto col = gig::getPrototype().getObject<collection>("col");
 		auto value = col.findMany(args);
 		return collection::setParentModel(
-			value, venue::getPrototype());
+			value, gig::getPrototype());
 	}
+
 }  // namespace gg

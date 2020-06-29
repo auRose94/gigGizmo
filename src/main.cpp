@@ -5,6 +5,7 @@
 
 #include "band.hpp"
 #include "error.hpp"
+#include "gig.hpp"
 #include "index.hpp"
 #include "login.hpp"
 #include "register.hpp"
@@ -28,12 +29,12 @@ int main() {
 		return 1;
 	}
 
-	session::getPrototype().setString(
-		"domain", "127.0.0.1:8080");
+	session::getPrototype().setString("domain", "127.0.0.1:8080");
 
 	setIndexRoute(db, serv);
 
 	band::setRoutes(db, serv);
+	gig::setRoutes(db, serv);
 	session::setRoutes(db, serv);
 	upload::setRoutes(db, serv);
 	user::setRoutes(db, serv);
@@ -44,7 +45,7 @@ int main() {
 		auto res = args[1].getObject<response>();
 		gold::list content =
 			errorPage({genericError("404 Page not found")});
-		res.writeStatus({"404 NOT FOUND"});
+		res.writeStatus({404});
 		res.end({getTemplate(req, content)});
 		return gold::var();
 	})});

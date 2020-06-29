@@ -11,12 +11,12 @@ namespace gg {
 	using list = gold::list;
 	using var = gold::var;
 
-	struct band : public model {
+	struct gig : public model {
 	 public:
 		static std::map<string, string> nameMap;
 		static object& getPrototype();
-		band();
-		band(object data);
+		gig();
+		gig(object data);
 
 		var addOwners(list args);
 		var removeOwners(list args);
@@ -25,12 +25,12 @@ namespace gg {
 
 		var save(list args = {});
 
-		static list bandCreate(session sesh, user u, obj data, obj errs);
-		static list bandOptions(session sesh, user u, band item);
-		static list bandFind(session sesh, user u, obj data, list items);
-		static list bandList(
+		static list gigCreate(session sesh, user u, obj data, obj errs);
+		static list gigOptions(session sesh, user u, gig item);
+		static list gigFind(session sesh, user u, obj data, list items);
+		static list gigList(
 			session sesh, user u, obj filter, list results);
-		static list bandIndex(session sesh, user u, band b);
+		static list gigIndex(session sesh, user u, gig b);
 
 		static void setRoutes(database, server);
 		static var findOne(list args);

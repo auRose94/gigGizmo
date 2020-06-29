@@ -12,7 +12,7 @@ namespace gg {
 	using namespace gold;
 	using namespace gg::bs;
 	using div = HTML::div;
-	gold::list band::bandFind(obj data, obj errs) {
+	gold::list band::bandFind(session sesh, user u, obj data, list items) {
 		auto content = gold::list{
 			div({
 				obj{{"class", "card pageCard text-light bg-dark"}},

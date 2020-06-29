@@ -4,6 +4,7 @@
 #include <server.hpp>
 
 #include "user.hpp"
+#include "session.hpp"
 
 namespace gg {
 	using namespace gold;
@@ -16,7 +17,6 @@ namespace gg {
 		static bool createUpload(string p, string_view data);
 	 public:
 		static object& getPrototype();
-		static collection col;
 		upload();
 		upload(object data);
 
@@ -25,10 +25,11 @@ namespace gg {
 		var isOwner(list args);
 		var getOwners(list args);
 
-		static list uploadOptions(user u, obj data, obj errs);
-		static list uploadFind(obj data, obj errs);
-		static list uploadList(obj filter, list results);
-		static list uploadIndex(upload b);
+		static list uploadOptions(session sesh, user u, upload item);
+		static list uploadFind(session sesh, user u, obj data, list items);
+		static list uploadList(session sesh, user u, obj filter, list results);
+		static list uploadIndex(session sesh, user u, upload b);
+		static var cropperDialog();
 
 		static void setRoutes(database, server);
 		static var findOne(list args);

@@ -13,8 +13,13 @@ namespace gg {
 	using namespace gg::bs;
 	using div = HTML::div;
 	using link = HTML::link;
-	gold::list venue::venueIndex(venue b) {
-		auto iconSrc = "/upload/" + b.getString("icon") + "/image";
+	gold::list venue::venueIndex(session sesh, user u, venue b) {
+		auto q = string();
+		if (sesh && !sesh.getBool("useCookies"))
+			q = "?s=" + sesh.getString("_id");
+		auto iconSrc =
+			"/upload/" + b.getString("icon") + "/image" + q;
+		auto iconPage = "/upload/" + b.getString("icon") + q;
 		auto content = gold::list{
 			div({
 				obj{{"class", "card pageCard text-light bg-dark"}},
@@ -23,12 +28,15 @@ namespace gg {
 					h5({obj{{"class", "card-title"}},
 							b.getString("name")}),
 					div({
-						img({atts{
-							{"src", iconSrc},
-							{"width", "256"},
-							{"height", "256"},
-							{"class", "float-left shadow-lg rounded mr-3"},
-						}}),
+						a({
+							atts{{"href", iconPage}},
+							img({atts{
+								{"src", iconSrc},
+								{"width", "256"},
+								{"height", "256"},
+								{"class", "float-left shadow-lg rounded mr-3"},
+							}}),
+						}),
 						div({
 							atts{{"class", "descContainer"}},
 							b.getString("longDesc"),

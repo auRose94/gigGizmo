@@ -149,17 +149,17 @@ namespace gg {
 					string::npos) {
 					string error;
 					if (user::invalidEmail(userEmail, error)) {
-						res.writeStatus({"401 Unauthorized"});
+						res.writeStatus({401});
 						return res.end({obj{{"error", error}}});
 					} else if (user::invalidPassword(
 											 userPassword, error)) {
-						res.writeStatus({"401 Unauthorized"});
+						res.writeStatus({401});
 						return res.end({obj{{"error", error}}});
 					} else {
 						auto loggedIn =
 							user::login(userEmail, userPassword, agent);
 						if (loggedIn.isError()) {
-							res.writeStatus({"401 Unauthorized"});
+							res.writeStatus({401});
 							return res.end({obj{{"error", loggedIn}}});
 						} else if (loggedIn.isList()) {
 							auto ret = loggedIn.getList();
@@ -167,7 +167,7 @@ namespace gg {
 							sesh.writeSession({obj{{"res", res}}});
 							return res.end({obj{{"session", sesh}}});
 						} else {
-							res.writeStatus({"401 Unauthorized"});
+							res.writeStatus({401});
 							return res.end({obj{{"error", "invalid login"}}});
 						}
 					}

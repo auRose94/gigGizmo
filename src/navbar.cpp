@@ -73,8 +73,7 @@ namespace gg {
 		return op;
 	}
 
-	gold::HTML::ul navbar(
-		user u, session sesh, string current) {
+	gold::HTML::ul navbar(user u, session sesh, string current) {
 		string firstName = "User";
 		string q = "";
 		auto errors = gold::list();
@@ -99,16 +98,23 @@ namespace gg {
 					"/list/band" + q, "List Bands", current),
 				navDropdownItem("/find/band" + q, "Find Band", current),
 			});
+			auto gItems = gold::list({
+				navDropdownItem("/gig" + q, "New Gig", current),
+				navDropdownItem("/list/gig" + q, "List Gigs", current),
+				navDropdownItem("/find/gig" + q, "Find Gig", current),
+			});
 			auto uItem = gold::list({
 				navDropdownItem("/home" + q, "Home", current),
 				navDropdownItem("/options" + q, "Options", current),
+				navDropdownItem("/list/upload" + q, "Uploads", current),
 				navDropdownItem("/register" + q, "Register", current),
 				navDropdownItem("/login" + q, "Login", current),
 			});
 			ret +=
 				{navDropdown("userDropdown", userDropdownTitle, uItem),
 				 navDropdown("venueDropdown", "Venue", vItems),
-				 navDropdown("bandDropdown", "Band", bItems)};
+				 navDropdown("bandDropdown", "Band", bItems),
+				 navDropdown("gigDropdown", "Gig", gItems)};
 		} else {
 			auto uItems = gold::list({
 				navDropdownItem("/register" + q, "Register", current),
@@ -116,14 +122,15 @@ namespace gg {
 				navDropdownItem("/login" + q, "Login", current),
 			});
 
-			ret +=
-				{navDropdown("userDropdown", userDropdownTitle, uItems),
-				 navOption("/find/venue/" + q, "Find Venue", current),
-				 navOption("/find/band/" + q, "Find Music", current)};
+			ret += {
+				navDropdown("userDropdown", userDropdownTitle, uItems),
+				navOption("/find/venue/" + q, "Find Venue", current),
+				navOption("/find/band/" + q, "Find Music", current),
+				navOption("/find/gig/" + q, "Find Gig", current),
+			};
 		}
 
-		auto errJson = errors.getJSON();
-		auto errComment = string("<!--") + errJson.dump() + "-->";
+		auto errComment = string("<!--") + errors.getJSON() + "-->";
 		ret += {errComment};
 		return ret;
 	}

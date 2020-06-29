@@ -53,7 +53,7 @@ namespace gg {
 		}
 		if (redirect.size() != 0) {
 			res.writeHeader({"Location", url});
-			res.writeStatus({"303 See Other"});
+			res.writeStatus({303});
 		}
 		return var();
 	}

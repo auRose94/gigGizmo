@@ -3,6 +3,7 @@
 #include "../../../include/bootstrap.hpp"
 #include "session.hpp"
 #include "template.hpp"
+#include "upload.hpp"
 #include "user.hpp"
 #include "venue.hpp"
 
@@ -14,84 +15,7 @@ namespace gg {
 	using link = HTML::link;
 	using div = HTML::div;
 
-	div cropperDialog() {
-		return div({
-			atts{
-				{"class", "modal fade"},
-				{"id", "cropperModal"},
-				{"tabIndex", "-1"},
-				{"role", "dialog"},
-				{"aria-labelledby", "cropperTitle"},
-				{"aria-hidden", true},
-			},
-			div({
-				atts{
-					{"class", "modal-dialog text-light bg-dark"},
-					{"role", "document"},
-				},
-				div({
-					atts{
-						{"class", "modal-content text-light bg-dark"},
-					},
-					div({
-						atts{{"class", "modal-header"}},
-						h5({atts{
-									{"class", "modal-title"},
-									{"id", "cropperTitle"},
-								},
-								"Crop before uploading..."}),
-						button({
-							atts{
-								{"type", "button"},
-								{"class", "close"},
-								{"data-dismiss", "modal"},
-								{"aria-label", "Close"},
-							},
-							span({
-								atts{
-									{"aria-hidden", true},
-								},
-								"&times;",
-							}),
-						}),
-					}),
-					div({
-						atts{
-							{"class", "modal-body"},
-						},
-						input({atts{
-							{"type", "file"},
-							{"class", "invisible"},
-							{"id", "fileInputDummy"},
-						}}),
-						div({
-							atts{{"id", "cropperContainer"}},
-							div({atts{{"id", "cropper"}}}),
-						}),
-					}),
-					div({
-						atts{{"class", "modal-footer"}},
-						button({
-							atts{
-								{"type", "button"},
-								{"class", "btn btn-secondary"},
-								{"data-dismiss", "modal"},
-							},
-							"Close",
-						}),
-						button({
-							atts{{"type", "button"},
-									 {"class", "btn btn-primary"},
-									 {"id", "cropperModalAccept"}},
-							"Accept",
-						}),
-					}),
-				}),
-			}),
-		});
-	}
-
-	form venueForm(user u, obj data, obj errs) {
+	form venueForm(session sesh, user u, obj data, obj errs) {
 		return form({
 			atts{{"method", "post"}},
 			row({
@@ -160,7 +84,7 @@ namespace gg {
 					div({
 						atts{{"class", "text-dark bg-light rounded"}},
 						div({
-							atts{{"id", "editor"},{"class", "rounded"}},
+							atts{{"id", "editor"}, {"class", "rounded"}},
 							data.getString("longDesc"),
 						}),
 					}),
@@ -206,7 +130,7 @@ namespace gg {
 		});
 	}
 
-	gold::list venue::venueCreate(user u, obj data, obj errs) {
+	gold::list venue::venueCreate(session sesh, user u, obj data, obj errs) {
 		auto errorBody = tbody();
 		if (errs)
 			for (auto it = errs.begin(); it != errs.end(); ++it) {
@@ -259,8 +183,8 @@ namespace gg {
 						 "any issues, please feel free to contact "
 						 "support."}),
 					errs.size() > 0 ? div({errorTable}) : div{},
-					venueForm(u, data, errs),
-					cropperDialog(),
+					venueForm(sesh, u, data, errs),
+					upload::cropperDialog(),
 				}),
 			}),
 			script({

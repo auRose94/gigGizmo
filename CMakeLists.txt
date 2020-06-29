@@ -67,6 +67,11 @@ add_executable(
 	src/routes/band/index.cpp
 	src/routes/band/list.cpp
 	src/routes/band/options.cpp
+	src/routes/gig/create.cpp
+	src/routes/gig/find.cpp
+	src/routes/gig/index.cpp
+	src/routes/gig/list.cpp
+	src/routes/gig/options.cpp
 	src/routes/upload/find.cpp
 	src/routes/upload/index.cpp
 	src/routes/upload/list.cpp
@@ -84,6 +89,7 @@ add_executable(
 	src/band.cpp
 	src/bootstrap.cpp
 	src/error.cpp
+	src/gig.cpp
 	src/navbar.cpp
 	src/main.cpp
 	src/session.cpp

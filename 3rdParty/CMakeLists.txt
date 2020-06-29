@@ -118,10 +118,6 @@ if(NOT (IS_SYMLINK ${BUILD_ROOT}/css/bootstrap-table))
 	)
 endif()
 
-
-
-
-
 get_filename_component(
 	FONTAWESOME_ABS
 	"./fontawesome/"
@@ -142,6 +138,31 @@ if(NOT (IS_SYMLINK ${BUILD_ROOT}/css/fontawesome))
 		CREATE_LINK 
 		${FONTAWESOME_ABS}
 		${BUILD_ROOT}/css/fontawesome
+		SYMBOLIC
+	)
+endif()
+
+
+get_filename_component(
+	JQUERYUI_ABS
+	"./jquery-ui/"
+	ABSOLUTE
+)
+
+if(NOT (IS_SYMLINK ${BUILD_ROOT}/js/jquery-ui))
+	file(
+		CREATE_LINK 
+		${JQUERYUI_ABS}
+		${BUILD_ROOT}/js/jquery-ui
+		SYMBOLIC
+	)
+endif()
+
+if(NOT (IS_SYMLINK ${BUILD_ROOT}/css/jquery-ui))
+	file(
+		CREATE_LINK 
+		${JQUERYUI_ABS}
+		${BUILD_ROOT}/css/jquery-ui
 		SYMBOLIC
 	)
 endif()

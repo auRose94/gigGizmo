@@ -98,11 +98,9 @@ namespace gg {
 							bs::col({formSelect(
 								"gender", "Gender", false, {},
 								{
-									formSelectOption(
-										"(Blank)", "", gender == ""),
+									formSelectOption("(Blank)", "", gender == ""),
 									formSelectOption(
 										"Non-Binary", "n", gender == "n"),
-									formSelectOption("Trans", "t", gender == "t"),
 									formSelectOption(
 										"Female", "f", gender == "f"),
 									formSelectOption("Male", "m", gender == "m"),

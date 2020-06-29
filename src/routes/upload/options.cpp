@@ -1,4 +1,4 @@
 #include "upload.hpp"
 namespace gg {
-	list upload::uploadOptions(user u, obj data, obj errs) {}
+	list upload::uploadOptions(session sesh, user u, upload item) {}
 }  // namespace gg

@@ -1,7 +1,7 @@
 #include <iostream>
 
-#include "band.hpp"
 #include "bootstrap.hpp"
+#include "gig.hpp"
 #include "session.hpp"
 #include "template.hpp"
 #include "user.hpp"
@@ -13,7 +13,7 @@ namespace gg {
 	using namespace gg::bs;
 	using div = HTML::div;
 	using link = HTML::link;
-	gold::list band::bandList(
+	gold::list gig::gigList(
 		session sesh, user u, obj filter, list results) {
 		auto q = string();
 		if (sesh && !sesh.getBool("useCookies"))
@@ -26,7 +26,7 @@ namespace gg {
 					obj{{"class", "card-body"}},
 					h5({
 						obj{{"class", "card-title"}},
-						"List Bands",
+						"List Gigs",
 					}),
 				}),
 				div({
@@ -48,7 +48,8 @@ namespace gg {
 							{"data-show-fullscreen", "true"},
 							{"data-buttons-align", "left"},
 							{"data-trim-on-search", "true"},
-							{"data-url", "/list/band.json" + q},
+							{"data-response-handler", "gigResponseHandler"},
+							{"data-url", "/list/gig.json" + q},
 						},
 						thead({
 							tr({
@@ -64,13 +65,22 @@ namespace gg {
 									{atts{
 										 {"scope", "col"},
 										 {"class", "text-light"},
-										 {"data-field", "name"},
+										 {"data-field", "bands"},
 										 {"data-sortable", "true"},
 										 {"data-width", "40"},
 										 {"data-width-unit", "%"},
-										 {"data-formatter", "window.nameFormatter"},
 									 },
-									 "Name"}),
+									 "Band(s)"}),
+								th(
+									{atts{
+										 {"scope", "col"},
+										 {"class", "text-light"},
+										 {"data-field", "venue"},
+										 {"data-sortable", "true"},
+										 {"data-width", "40"},
+										 {"data-width-unit", "%"},
+									 },
+									 "Venue"}),
 								th({atts{
 											{"scope", "col"},
 											{"class", "text-light"},
@@ -111,7 +121,7 @@ namespace gg {
 				}),
 				script({
 					atts{
-						{"src", "/js/main/bandList.js"},
+						{"src", "/js/main/gigList.js"},
 					},
 				}),
 				script({

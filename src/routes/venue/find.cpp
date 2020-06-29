@@ -12,7 +12,7 @@ namespace gg {
 	using namespace gold;
 	using namespace gg::bs;
 	using div = HTML::div;
-	gold::list venue::venueFind(user u, obj data, list venues) {
+	gold::list venue::venueFind(session sesh, user u, obj data, list venues) {
 		auto content = gold::list{
 			div({
 				obj{{"class", "card pageCard text-light bg-dark"}},

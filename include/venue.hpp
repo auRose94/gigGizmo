@@ -24,12 +24,12 @@ namespace gg {
 
 		var save(list args = {});
 
-		static list venueCreate(user u, obj data, obj errs);
-		static list venueOptions(user u, venue ven);
-		static list venueFind(user u, obj data, list venues);
+		static list venueCreate(session sesh, user u, obj data, obj errs);
+		static list venueOptions(session sesh, user u, venue ven);
+		static list venueFind(session sesh, user u, obj data, list venues);
 		static list venueList(
 			session sesh, user u, obj filter, list results);
-		static list venueIndex(venue b);
+		static list venueIndex(session sesh, user u, venue b);
 
 		static void setRoutes(database, server);
 		static var findOne(list args);
